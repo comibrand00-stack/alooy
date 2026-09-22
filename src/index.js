@@ -4,7 +4,7 @@ const REPO_JSON = {
   description: "AlooTV & JoooTV - أفلام ومسلسلات",
   manifestVersion: 1,
   pluginLists: [
-    "https://raw.githubusercontent.com/USERNAME/REPO_NAME/builds/plugins.json"
+    "https://raw.githubusercontent.com/comibrand00-stack/alooy/builds/plugins.json"
   ]
 };
 
