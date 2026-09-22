@@ -6,5 +6,7 @@ cloudstream {
 
     status = 1
 
+    language = "ar"
+
     tvTypes = listOf("Movies", "TvSeries")
 }
