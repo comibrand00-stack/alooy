@@ -1,4 +1,4 @@
-name: Build plugins
+name: Build
 
 concurrency:
   group: "build"
@@ -30,26 +30,20 @@ jobs:
       - name: Clean old builds
         run: rm -f $GITHUB_WORKSPACE/builds/*.cs3 $GITHUB_WORKSPACE/builds/plugins.json
 
-      - name: Setup JDK 11
+      - name: Setup JDK 17
         uses: actions/setup-java@v1
         with:
-          java-version: 11
+          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
-
-      - name: Setup Gradle 7.4.2
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: "7.4.2"
 
       - name: Build Plugins
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
           ./gradlew make makePluginsJson
-          cp AlooTVProvider/build/*.cs3 $GITHUB_WORKSPACE/builds || true
-          cp buildPlugins/plugins.json $GITHUB_WORKSPACE/builds || true
+          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds || true
           cp build/plugins.json $GITHUB_WORKSPACE/builds || true
 
       - name: Push builds

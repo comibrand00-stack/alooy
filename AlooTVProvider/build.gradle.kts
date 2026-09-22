@@ -8,5 +8,5 @@ cloudstream {
 
     language = "ar"
 
-    tvTypes = listOf("Movies", "TvSeries")
+    tvTypes = listOf("Movie", "TvSeries")
 }
