@@ -45,6 +45,10 @@ jobs:
           ./gradlew make makePluginsJson --stacktrace > /tmp/gradle.log 2>&1 || true
           grep -E "^e: " /tmp/gradle.log | head -n 30 | while IFS= read -r line; do echo "::error::$line"; done
           tail -n 5 /tmp/gradle.log
+          if grep -q "BUILD SUCCESSFUL" /tmp/gradle.log; then
+            cp **/build/*.cs3 $GITHUB_WORKSPACE/builds 2>/dev/null || true
+            cp build/plugins.json $GITHUB_WORKSPACE/builds 2>/dev/null || true
+          fi
           exit 0
 
       - name: Push builds

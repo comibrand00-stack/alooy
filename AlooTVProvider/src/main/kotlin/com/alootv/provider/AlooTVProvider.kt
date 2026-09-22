@@ -1,9 +1,7 @@
 package com.alootv.provider
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class AlooTVProvider : MainAPI() {
@@ -66,11 +64,10 @@ class AlooTVProvider : MainAPI() {
             val episodeNumber = link.text().replace("Ep#", "").replace("حلقة", "").trim().toIntOrNull()
                 ?: (index + 1)
             newEpisode(
-                fixUrl(link.attr("href")),
-                fix = false
+                fixUrl(link.attr("href"))
             ) {
                 name = link.text().trim()
-                episode = episodeNumber
+                this.episode = episodeNumber
             }
         }
 
