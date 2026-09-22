@@ -58,4 +58,13 @@ jobs:
           git config --local user.name "GitHub Actions"
           git add .
           git commit --amend -m "Build $GITHUB_SHA" || exit 0
-          git push --force
+          set +e
+          OUTPUT=$(git push --force 2>&1)
+          PUSH_EXIT=$?
+          set -e
+          if [ $PUSH_EXIT -ne 0 ]; then
+            echo "$OUTPUT" | while IFS= read -r line; do echo "::error::$line"; done
+          else
+            echo "$OUTPUT"
+          fi
+          exit $PUSH_EXIT
