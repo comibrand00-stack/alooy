@@ -1,0 +1,14 @@
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+*.log
+.DS_Store
+.vscode/
+.idea/
+.gradle/
+build/
+**/build/
+*.cs3
+plugins.json
+local.properties

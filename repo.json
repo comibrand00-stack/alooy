@@ -1,0 +1,8 @@
+{
+  "name": "AlooTV repository",
+  "description": "AlooTV & JoooTV - أفلام ومسلسلات",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/USERNAME/REPO_NAME/builds/plugins.json"
+  ]
+}
