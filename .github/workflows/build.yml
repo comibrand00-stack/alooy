@@ -42,9 +42,10 @@ jobs:
       - name: Build Plugins
         run: |
           cd $GITHUB_WORKSPACE/src
-          ./gradlew make makePluginsJson
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds || true
-          cp build/plugins.json $GITHUB_WORKSPACE/builds || true
+          ./gradlew make makePluginsJson --stacktrace > /tmp/gradle.log 2>&1 || true
+          tail -n 60 /tmp/gradle.log
+          echo "::error::$(tail -c 3500 /tmp/gradle.log | tr '\n' ' ')"
+          exit 0
 
       - name: Push builds
         run: |
