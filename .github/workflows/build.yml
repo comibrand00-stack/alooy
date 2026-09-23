@@ -42,14 +42,9 @@ jobs:
       - name: Build Plugins
         run: |
           cd $GITHUB_WORKSPACE/src
-          ./gradlew make makePluginsJson --stacktrace > /tmp/gradle.log 2>&1 || true
-          grep -E "^e: " /tmp/gradle.log | head -n 30 | while IFS= read -r line; do echo "::error::$line"; done
-          tail -n 5 /tmp/gradle.log
-          if grep -q "BUILD SUCCESSFUL" /tmp/gradle.log; then
-            cp **/build/*.cs3 $GITHUB_WORKSPACE/builds 2>/dev/null || true
-            cp build/plugins.json $GITHUB_WORKSPACE/builds 2>/dev/null || true
-          fi
-          exit 0
+          ./gradlew make makePluginsJson --stacktrace
+          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
+          cp build/plugins.json $GITHUB_WORKSPACE/builds
 
       - name: Push builds
         run: |
@@ -58,13 +53,4 @@ jobs:
           git config --local user.name "GitHub Actions"
           git add .
           git commit --amend -m "Build $GITHUB_SHA" || exit 0
-          set +e
-          OUTPUT=$(git push --force 2>&1)
-          PUSH_EXIT=$?
-          set -e
-          if [ $PUSH_EXIT -ne 0 ]; then
-            echo "$OUTPUT" | while IFS= read -r line; do echo "::error::$line"; done
-          else
-            echo "$OUTPUT"
-          fi
-          exit $PUSH_EXIT
+          git push --force
