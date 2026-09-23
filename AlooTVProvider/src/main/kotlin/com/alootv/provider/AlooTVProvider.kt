@@ -14,10 +14,19 @@ class AlooTVProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "/" to "الرئيسية",
-        "/genre/arabic.html" to "أفلام عربية",
-        "/genre/korean-movies.html" to "أفلام كورية",
+        "/genre/arabic.html" to "مسلسلات عربية",
+        "/genre/kleeji.html" to "مسلسلات خليجية",
+        "/genre/turki.html" to "مسلسلات تركية",
+        "/genre/Foreign-series.html" to "مسلسلات أجنبية",
+        "/genre/asia-series.html" to "مسلسلات آسيوية",
+        "/genre/anmi.html" to "أنمي",
+        "/genre/farisi.html" to "مسلسلات فارسية",
+        "/genre/arabic-movies.html" to "أفلام عربية",
         "/genre/foreign-movies.html" to "أفلام أجنبية",
-        "/tv-series.html" to "مسلسلات"
+        "/genre/masrahiyat.html" to "مسرحيات",
+        "/genre/ramadan-arabi.html" to "رمضان عربي",
+        "/genre/ramadan-kleeji.html" to "رمضان خليجي",
+        "/tv-series.html" to "أحدث المسلسلات"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
@@ -26,8 +35,10 @@ class AlooTVProvider : MainAPI() {
         val document = app.get(pageUrl).document
         val type = when {
             path == "/" -> null
-            path.contains("tv-series") || path.contains("series") -> TvType.TvSeries
-            else -> TvType.Movie
+            path.contains("movies") || path.contains("masrahiyat") -> TvType.Movie
+            path.contains("tv-series") || path.contains("series") || path.contains("anmi") ->
+                TvType.TvSeries
+            else -> null
         }
         val items = document.select("div.movie-img").mapNotNull { it.toSearchResponse(type) }
         return newHomePageResponse(request.name, items)
