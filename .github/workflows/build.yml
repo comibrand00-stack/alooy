@@ -23,10 +23,16 @@ jobs:
 
       - name: Debug token permissions
         run: |
-          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+          RESULT=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/comibrand00-stack/alooy | \
-            python3 -c "import json,sys; d=json.load(sys.stdin); print('permissions:', json.dumps(d.get('permissions',{}))); print('pushable:', d.get('pushable'))"
+            python3 -c "import json,sys; d=json.load(sys.stdin); import sys; sys.stdout.write('permissions: ' + json.dumps(d.get('permissions',{})) + '; pushable: ' + str(d.get('pushable')) + '; message: ' + str(d.get('message')))")
+          echo "::notice::$RESULT"
+          curl -s -o /dev/null -w "%{http_code}\n" -X PUT \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/comibrand00-stack/alooy/contents/debug-test.txt \
+            -d '{"message":"test","content":"dGVzdA=="}' | while IFS= read -r line; do echo "::notice::contents+write probe: HTTP $line"; done
 
       - name: Prepares executable
         run: chmod +x $GITHUB_WORKSPACE/src/gradlew
