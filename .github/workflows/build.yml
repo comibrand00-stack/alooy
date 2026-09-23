@@ -21,6 +21,13 @@ jobs:
         with:
           path: "src"
 
+      - name: Debug token permissions
+        run: |
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/comibrand00-stack/alooy | \
+            python3 -c "import json,sys; d=json.load(sys.stdin); print('permissions:', json.dumps(d.get('permissions',{}))); print('pushable:', d.get('pushable'))"
+
       - name: Prepares executable
         run: chmod +x $GITHUB_WORKSPACE/src/gradlew
 
@@ -53,4 +60,12 @@ jobs:
           git config --local user.name "GitHub Actions"
           git add .
           git commit --amend -m "Build $GITHUB_SHA" || exit 0
-          git push --force
+          set +e
+          OUTPUT=$(git push --force 2>&1)
+          PUSH_EXIT=$?
+          set -e
+          echo "$OUTPUT"
+          if [ $PUSH_EXIT -ne 0 ]; then
+            echo "$OUTPUT" | while IFS= read -r line; do echo "::error::$line"; done
+          fi
+          exit $PUSH_EXIT
