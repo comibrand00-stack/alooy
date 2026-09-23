@@ -14,7 +14,9 @@ class AlooTVProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "/" to "الرئيسية",
-        "/movies.html" to "أفلام",
+        "/genre/arabic.html" to "أفلام عربية",
+        "/genre/korean-movies.html" to "أفلام كورية",
+        "/genre/foreign-movies.html" to "أفلام أجنبية",
         "/tv-series.html" to "مسلسلات"
     )
 
@@ -22,23 +24,28 @@ class AlooTVProvider : MainAPI() {
         val path = request.data
         val pageUrl = if (page > 1) "$mainUrl$path?page=$page" else "$mainUrl$path"
         val document = app.get(pageUrl).document
-        val items = document.select("div.movie-img").mapNotNull { it.toSearchResponse(path) }
+        val type = when {
+            path == "/" -> null
+            path.contains("tv-series") || path.contains("series") -> TvType.TvSeries
+            else -> TvType.Movie
+        }
+        val items = document.select("div.movie-img").mapNotNull { it.toSearchResponse(type) }
         return newHomePageResponse(request.name, items)
     }
 
     override suspend fun search(query: String): List<SearchResponse>? {
         val document = app.get("$mainUrl/search", params = mapOf("q" to query)).document
-        return document.select("div.movie-img").mapNotNull { it.toSearchResponse("/search") }
+        return document.select("div.movie-img").mapNotNull { it.toSearchResponse(null) }
     }
 
-    private fun Element.toSearchResponse(path: String): SearchResponse? {
+    private fun Element.toSearchResponse(categoryType: TvType?): SearchResponse? {
         val a = selectFirst("a[href*='/watch/']") ?: return null
         val img = selectFirst("img") ?: return null
         val title = img.attr("alt").ifBlank { a.text().ifBlank { return null } }
         val poster = fixUrlNull(img.attr("data-src").ifBlank { img.attr("src") })
         val href = fixUrl(a.attr("href"))
 
-        val type = if (path.contains("tv-series")) TvType.TvSeries else TvType.Movie
+        val type = categoryType ?: if (href.contains("-series") || href.contains("season")) TvType.TvSeries else TvType.Movie
         return if (type == TvType.Movie) {
             newMovieSearchResponse(title, href, TvType.Movie) { addPoster(poster) }
         } else {
