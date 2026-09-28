@@ -14,6 +14,8 @@ class SolarMovieProvider : MainAPI() {
     override var mainUrl = "https://ww1.solarmovie2.com"
     private val playerApi = "https://ployan.live"
     private val imgBase = "https://img.icdn.my.id"
+    private val dataApi = "https://data.vidsrc.sh/api.php"
+    private val cloudReferer = "https://cloudorchestranova.com/"
     override var name = "SolarMovie2"
     override var lang = "en"
     override val hasMainPage = true
@@ -21,9 +23,9 @@ class SolarMovieProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
-        "/movies/1/" to "Movies - أفلام",
-        "/series/1/" to "TV-Series - مسلسلات",
-        "/top-imdb/1/" to "Top IMDb - الأعلى تقييماً",
+        "/movies/" to "Movies - أفلام",
+        "/series/" to "TV-Series - مسلسلات",
+        "/top-imdb/" to "Top IMDb - الأعلى تقييماً",
         "/genre/action.html" to "Action - أكشن",
         "/genre/adventure.html" to "Adventure - مغامرات",
         "/genre/animation.html" to "Animation - أنيميشن",
@@ -36,27 +38,26 @@ class SolarMovieProvider : MainAPI() {
         "/genre/thriller.html" to "Thriller - إثارة"
     )
 
-    private fun buildPageUrl(base: String, page: Int): String {
+    private fun buildPageUrl(base: String, page: Int): String? {
         if (page <= 1) return "$mainUrl$base"
-        // /movies/1/ -> /movies/2/
-        if (base.matches(Regex("""/(movies|series|top-imdb)/\d+/"""))) {
-            return "$mainUrl${base.replace(Regex("""/\d+/"""), "/$page/")}"
-        }
-        if (base.matches(Regex("""/(movies|series|top-imdb)/"""))) {
+        // /movies/ -> /movies/2/  (note: /movies/1/ is a redirect stub, must NOT be used)
+        if (base == "/movies/" || base == "/series/" || base == "/top-imdb/") {
             return "$mainUrl$base$page/"
         }
-        // /genre/action.html -> /genre/action.html2/  (site appends page number)
-        if (base.startsWith("/genre/") && base.endsWith(".html")) {
-            return "$mainUrl$base$page/"
-        }
-        return "$mainUrl$base"
+        // genre pages have no URL pagination
+        return null
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = buildPageUrl(request.data, page)
-        val document = app.get(url).document
-        val items = document.select("div.col div.card a.poster").mapNotNull { it.toSearchResponse() }
-            .ifEmpty { document.select("a.poster").mapNotNull { it.toSearchResponse() } }
+            ?: return newHomePageResponse(request.name, emptyList())
+        val items = try {
+            val document = app.get(url).document
+            document.select("div.col div.card a.poster").mapNotNull { it.toSearchResponse() }
+                .ifEmpty { document.select("a.poster").mapNotNull { it.toSearchResponse() } }
+        } catch (_: Exception) {
+            emptyList()
+        }
         return newHomePageResponse(request.name, items)
     }
 
@@ -91,8 +92,6 @@ class SolarMovieProvider : MainAPI() {
             params = mapOf("q" to query, "limit" to "30", "offset" to "0"),
             headers = mapOf("Accept" to "application/json", "Referer" to "$mainUrl/")
         ).text
-        // minimal manual JSON parse to avoid extra deps
-        // find all {...} with "t","s"
         val out = mutableListOf<SearchResponse>()
         val objRegex = Regex("""\{"t":"(.*?)","s":"(.*?)".*?"d":"(.*?)".*?"q":"(.*?)".*?"y":(\d+)""")
         for (m in objRegex.findAll(res)) {
@@ -100,7 +99,6 @@ class SolarMovieProvider : MainAPI() {
                 val title = m.groupValues[1]
                 val slug = m.groupValues[2]
                 val kind = m.groupValues[3] // m = movie, s = series
-                val quality = m.groupValues[4]
                 val year = m.groupValues[5].toIntOrNull()
                 val url = "$mainUrl/movie/$slug.html"
                 val poster = "$imgBase/thumb/w_156/h_234/$slug.jpg"
@@ -116,7 +114,6 @@ class SolarMovieProvider : MainAPI() {
                 }
             } catch (_: Exception) { }
         }
-        // fallback: /search.html?q= (server rendered for some queries)
         if (out.isEmpty()) {
             try {
                 val doc = app.get("$mainUrl/search.html", params = mapOf("q" to query)).document
@@ -155,7 +152,6 @@ class SolarMovieProvider : MainAPI() {
         val tags = document.select("a[href*=/tags/]").map { it.text().trim() }
 
         val episodesRaw = document.select("#eps-list .episode")
-        val serversCount = document.select("#srv-list .server").size
 
         // sanitize title for data payload (| is separator)
         val safeTitle = title.replace("|", "-").replace("\n", " ").trim().take(120)
@@ -214,13 +210,19 @@ class SolarMovieProvider : MainAPI() {
         return sb.toString()
     }
 
+    private fun hexToBytes(hex: String): ByteArray {
+        val out = ByteArray(hex.length / 2)
+        for (i in out.indices) out[i] = hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        return out
+    }
+
     private fun decryptInfo(password: String, token: String): String? {
         return try {
             val parts = token.split("-")
             if (parts.size != 3) return null
-            val salt = parts[0].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-            val iv = parts[1].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-            val ctTag = parts[2].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            val salt = hexToBytes(parts[0])
+            val iv = hexToBytes(parts[1])
+            val ctTag = hexToBytes(parts[2])
             if (salt.size != 8 || iv.size != 12 || ctTag.size < 17) return null
             val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
             val spec = PBEKeySpec(password.toCharArray(), salt, 1000, 256)
@@ -229,14 +231,197 @@ class SolarMovieProvider : MainAPI() {
             val ct = ctTag.copyOfRange(0, ctTag.size - 16)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, iv))
-            // JCE expects ct+tag combined
-            val combined = ct + tag
-            String(cipher.doFinal(combined), Charsets.UTF_8)
+            String(cipher.doFinal(ct + tag), Charsets.UTF_8)
         } catch (_: Exception) { null }
     }
 
     private fun extractJsonField(json: String, field: String): String? {
         return Regex(""""$field"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1)
+            ?.replace("\\/", "/")?.replace("\\u0026", "&")
+    }
+
+    // re("player", "mid-ep"): XOR each char with (xor of password bytes), hex-encoded.
+    // Used by ployan player to build /sub/{hash}/index.json subtitle URLs.
+    private fun reHash(password: String, text: String): String {
+        var k = 0
+        for (b in password.toByteArray(Charsets.UTF_8)) k = k xor (b.toInt() and 0xFF)
+        return text.toByteArray(Charsets.UTF_8).joinToString("") {
+            "%02x".format((it.toInt() and 0xFF) xor k)
+        }
+    }
+
+    // ---------- Server 1: direct HLS via ployan ----------
+    private suspend fun resolveServer1(
+        mid: String, ep: Int, label: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        return try {
+            val token = sealToken("$mid+$ep+1+${System.currentTimeMillis() / 1000}")
+            val json = app.get(
+                "$playerApi/get/$token",
+                headers = mapOf("Referer" to "$playerApi/", "Accept" to "application/json")
+            ).text
+            if (extractJsonField(json, "mode") != "direct") return false
+            val info = extractJsonField(json, "info") ?: return false
+            if (info.isBlank()) return false
+            callback(
+                newExtractorLink(
+                    source = "SolarMovie $label",
+                    name = "$label - HLS",
+                    url = "$playerApi/hls/$info/master.m3u8",
+                    type = ExtractorLinkType.M3U8
+                ) {
+                    referer = "$playerApi/"
+                    quality = Qualities.P1080.value
+                }
+            )
+            true
+        } catch (_: Exception) { false }
+    }
+
+    // ---------- Server 2/3: embed via ployan -> vidsrc data API -> WASM decrypt ----------
+    private suspend fun resolveEmbedServer(
+        mid: String, ep: Int, srv: String, label: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        try {
+            // 1. ployan token -> embed info -> tmdb id
+            val token = sealToken("$mid+$ep+$srv+${System.currentTimeMillis() / 1000}")
+            val json = app.get(
+                "$playerApi/get/$token",
+                headers = mapOf("Referer" to "$playerApi/", "Accept" to "application/json")
+            ).text
+            val mode = extractJsonField(json, "mode")
+            val info = extractJsonField(json, "info") ?: return false
+            if (info.isBlank()) return false
+            if (mode == "direct") {
+                // some titles serve direct on every server
+                callback(
+                    newExtractorLink(
+                        source = "SolarMovie $label",
+                        name = "$label - HLS",
+                        url = "$playerApi/hls/$info/master.m3u8",
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        referer = "$playerApi/"
+                        quality = Qualities.P1080.value
+                    }
+                )
+                return true
+            }
+            if (mode != "embed") return false
+            val inner = decryptInfo("player", info) ?: return false
+            // movie/452557-ts  |  tv/103516/2-1-ts
+            val movieMatch = Regex("""^movie/(\d+)-""").find(inner)
+            val tvMatch = Regex("""^tv/(\d+)/(\d+)-(\d+)-""").find(inner)
+            val apiUrl = when {
+                movieMatch != null ->
+                    "$dataApi?type=movie&tmdb=${movieMatch.groupValues[1]}&stream_urls"
+                tvMatch != null ->
+                    "$dataApi?type=tv&tmdb=${tvMatch.groupValues[1]}&season=${tvMatch.groupValues[2]}&episode=${tvMatch.groupValues[3]}&stream_urls"
+                else -> return false
+            }
+            // 2. stream data: encrypted urls + wasm decryptor url
+            val apiJson = app.get(
+                apiUrl, headers = mapOf("Referer" to cloudReferer, "Accept" to "application/json")
+            ).text
+            val blob = extractJsonField(apiJson, "stream_urls") ?: return false
+            val wasmUrl = extractJsonField(apiJson, "wasm_url")
+                ?: Regex(""""wasm_url"\s*:\s*"([^"]+)"""").find(apiJson)?.groupValues?.get(1)
+                    ?.replace("\\/", "/")?.replace("\\u0026", "&")
+                ?: return false
+            if (blob.isBlank()) return false
+            // 3. run rotating decryptor, exactly like vsdec.js
+            val wasmBytes = app.get(
+                wasmUrl, headers = mapOf("Referer" to cloudReferer)
+            ).body.byteStream().readBytes()
+            if (wasmBytes.size < 100) return false
+            val masters = VsWasm().decryptStreamUrls(wasmBytes, blob)
+            if (masters.isEmpty()) return false
+            // 4. per-host IP-bound token (mirrors player.js loadStream)
+            var emitted = 0
+            val tokenCache = mutableMapOf<String, String>()
+            masters.take(3).forEachIndexed { index, master ->
+                try {
+                    val host = Regex("""^(https://[^/]+)""").find(master)?.groupValues?.get(1)
+                        ?: return@forEachIndexed
+                    var tk = tokenCache[host]
+                    if (tk == null) {
+                        tk = try { fetchHostToken(host, master) } catch (_: Exception) { "" }
+                        tokenCache[host] = tk
+                    }
+                    val finalUrl = when {
+                        tk.isBlank() -> master
+                        master.contains("__TOKEN__") -> master.replace("__TOKEN__", tk)
+                        master.contains("?") -> "$master&token=$tk"
+                        else -> "$master?token=$tk"
+                    }
+                    val name = if (masters.size > 1) "$label - Mirror ${index + 1}" else "$label - HLS"
+                    callback(
+                        newExtractorLink(
+                            source = "SolarMovie $label",
+                            name = name,
+                            url = finalUrl,
+                            type = ExtractorLinkType.M3U8
+                        ) {
+                            referer = cloudReferer
+                            quality = Qualities.Unknown.value
+                        }
+                    )
+                    emitted++
+                } catch (_: Exception) { }
+            }
+            return emitted > 0
+        } catch (_: Exception) { return false }
+    }
+
+    private suspend fun fetchHostToken(host: String, referer: String): String {
+        val raw = app.get(
+            "$host/generate.php", headers = mapOf("Referer" to referer, "Accept" to "*/*")
+        ).text.trim()
+        if (raw.isBlank()) return ""
+        // mirror player.js parseToken: plain text or {"token"|"data"|"string"|"result":...}
+        if (!raw.startsWith("{") && !raw.startsWith("[")) return raw
+        return extractJsonField(raw, "token")
+            ?: extractJsonField(raw, "data")
+            ?: extractJsonField(raw, "string")
+            ?: extractJsonField(raw, "result")
+            ?: ""
+    }
+
+    // ---------- Subtitles: ployan /sub/{re(mid-ep)}/index.json, Arabic first ----------
+    private suspend fun loadPloyanSubs(
+        mid: String, ep: Int,
+        subtitleCallback: (SubtitleFile) -> Unit
+    ) {
+        try {
+            val h = reHash("player", "$mid-$ep")
+            val json = app.get(
+                "$playerApi/sub/$h/index.json",
+                headers = mapOf("Referer" to "$playerApi/", "Accept" to "application/json")
+            ).text
+            data class T(val file: String, val label: String, val lang: String?)
+            val subs = Regex("""\{[^}]*\}""").findAll(json).mapNotNull { m ->
+                val f = Regex(""""file"\s*:\s*"([^"]+)"""").find(m.value)?.groupValues?.get(1)
+                    ?: return@mapNotNull null
+                val l = Regex(""""label"\s*:\s*"([^"]+)"""").find(m.value)?.groupValues?.get(1)
+                    ?: "English"
+                val lg = Regex(""""lang"\s*:\s*"([^"]+)"""").find(m.value)?.groupValues?.get(1)
+                T(f, l, lg)
+            }.toList()
+            if (subs.isEmpty()) return
+            val rank = { t: T ->
+                when {
+                    t.lang == "ar" || t.label.contains("arab", true) || t.label.contains("العربية") -> 0
+                    t.lang == "en" || t.label.startsWith("English", true) -> 1
+                    else -> 2
+                }
+            }
+            subs.sortedBy(rank).take(8).forEach { (file, label, _) ->
+                val abs = if (file.startsWith("http")) file else playerApi + file
+                subtitleCallback(SubtitleFile(label, abs))
+            }
+        } catch (_: Exception) { }
     }
 
     override suspend fun loadLinks(
@@ -249,84 +434,16 @@ class SolarMovieProvider : MainAPI() {
         if (parts.size < 2) return false
         val mid = parts[0].trim()
         val ep = parts[1].trim().toIntOrNull() ?: 1
-        val title = parts.getOrNull(2)?.trim().takeIf { !it.isNullOrBlank() } ?: mid
-        val year = parts.getOrNull(3)?.trim()?.toIntOrNull()
+        if (mid.isBlank()) return false
 
         var found = false
-        // Servers on site: srv-1 (Server 1), srv-2 (Server 2), srv-5 (Server 3)
-        val servers = listOf("1" to "Server 1", "2" to "Server 2", "5" to "Server 3")
-        val ts = System.currentTimeMillis() / 1000
-
-        for ((srv, label) in servers) {
-            try {
-                val plain = "$mid+$ep+$srv+$ts"
-                val token = sealToken(plain)
-                val json = app.get(
-                    "$playerApi/get/$token",
-                    headers = mapOf("Referer" to "$playerApi/", "Accept" to "application/json"),
-                ).text
-                val mode = extractJsonField(json, "mode")
-                val info = extractJsonField(json, "info")
-                if (info.isNullOrBlank()) continue
-                if (mode == "direct") {
-                    val hls = "$playerApi/hls/$info/master.m3u8"
-                    callback(
-                        newExtractorLink(
-                            source = "SolarMovie $label",
-                            name = "$label - HLS",
-                            url = hls,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            referer = "$playerApi/"
-                            quality = Qualities.P1080.value
-                        }
-                    )
-                    found = true
-                    // keep trying other servers for more qualities/backups
-                } else if (mode == "embed") {
-                    // embed hosts (Server 2/3) need extra JS decrypt; try to log decoded path
-                    // decrypted looks like "movie/452557-<ts>" – not directly playable,
-                    // so we skip but keep Server 1 link. Future: resolve via external extractors.
-                    decryptInfo("player", info)
-                    continue
-                }
-            } catch (_: Exception) { continue }
-        }
-
-        // ---------- Arabic + English subtitles ----------
-        // 1) OpenSubtitles (old free REST, no key) – Arabic first
-        try {
-            val q = title.replace(Regex("""\s*\(\d{4}\)\s*"""), "").trim()
-                .replace(" ", "+").take(80)
-            if (q.length >= 2) {
-                // Arabic
-                try {
-                    val arJson = app.get(
-                        "https://rest.opensubtitles.org/search/query-$q/sublanguageid-ara",
-                        headers = mapOf("User-Agent" to "TemporaryUserAgent", "Accept" to "application/json")
-                    ).text
-                    // pick top by downloads
-                    val linkRegex = Regex(""""SubDownloadLink"\s*:\s*"([^"]+)"""")
-                    val links = linkRegex.findAll(arJson).map { it.groupValues[1] }.toList()
-                    // prefer first 2
-                    links.take(2).forEachIndexed { i, link ->
-                        val fixed = link.replace("\\/", "/")
-                        subtitleCallback(SubtitleFile(if (i == 0) "Arabic" else "Arabic $i", fixed))
-                    }
-                } catch (_: Exception) { }
-                // English fallback
-                try {
-                    val enJson = app.get(
-                        "https://rest.opensubtitles.org/search/query-$q/sublanguageid-eng",
-                        headers = mapOf("User-Agent" to "TemporaryUserAgent", "Accept" to "application/json")
-                    ).text
-                    val linkRegex = Regex(""""SubDownloadLink"\s*:\s*"([^"]+)"""")
-                    val link = linkRegex.find(enJson)?.groupValues?.get(1)?.replace("\\/", "/")
-                    if (!link.isNullOrBlank()) subtitleCallback(SubtitleFile("English", link))
-                } catch (_: Exception) { }
-            }
-        } catch (_: Exception) { }
-
+        // Server 1: direct HLS
+        if (resolveServer1(mid, ep, "Server 1", callback)) found = true
+        // Server 2 + Server 3: embed chain (vidsrc)
+        if (resolveEmbedServer(mid, ep, "2", "Server 2", callback)) found = true
+        if (resolveEmbedServer(mid, ep, "5", "Server 3", callback)) found = true
+        // Subtitles (host-independent, same mid/episode)
+        loadPloyanSubs(mid, ep, subtitleCallback)
         return found
     }
 }
