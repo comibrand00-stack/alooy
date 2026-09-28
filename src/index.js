@@ -1,7 +1,7 @@
 const UPSTREAM = "https://n.alooytv14.xyz";
 const REPO_JSON = {
-  name: "AlooTV repository",
-  description: "AlooTV & JoooTV - أفلام ومسلسلات",
+  name: "SolarMovie2 + AlooTV repository",
+  description: "SolarMovie2 - أفلام ومسلسلات أجنبية مع خوادم وترجمة عربية + AlooTV",
   manifestVersion: 1,
   pluginLists: [
     "https://raw.githubusercontent.com/comibrand00-stack/alooy/builds/plugins.json"

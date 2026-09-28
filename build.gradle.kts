@@ -39,7 +39,11 @@ subprojects {
     }
 
     android {
-        namespace = "com.alootv.provider"
+        namespace = when (project.name) {
+            "AlooTVProvider" -> "com.alootv.provider"
+            "SolarMovieProvider" -> "com.solarmovie.provider"
+            else -> "com.${project.name.lowercase()}.provider"
+        }
 
         defaultConfig {
             minSdk = 21

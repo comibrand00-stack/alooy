@@ -57,4 +57,4 @@ jobs:
           git config --local user.name "GitHub Actions"
           git add .
           git commit --amend -m "Build $GITHUB_SHA" || exit 0
-          git push --force https://x-access-token:${GITHUB_TOKEN}@github.com/comibrand00-stack/alooy.git builds 2>&1
+          git push --force https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git builds 2>&1

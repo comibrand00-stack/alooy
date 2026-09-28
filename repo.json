@@ -1,6 +1,6 @@
 {
-  "name": "AlooTV repository",
-  "description": "AlooTV & JoooTV - أفلام ومسلسلات",
+  "name": "SolarMovie2 + AlooTV repository",
+  "description": "SolarMovie2 (ww1.solarmovie2.com) - أفلام ومسلسلات أجنبية مع خوادم متعددة وترجمة عربية + AlooTV",
   "manifestVersion": 1,
   "pluginLists": [
     "https://raw.githubusercontent.com/comibrand00-stack/alooy/builds/plugins.json"

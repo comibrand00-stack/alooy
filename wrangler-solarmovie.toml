@@ -1,0 +1,8 @@
+name = "solarmovie-proxy"
+main = "src/index-solarmovie.js"
+compatibility_date = "2024-11-01"
+
+workers_dev = true
+
+[observability]
+enabled = true
