@@ -331,12 +331,12 @@ class SolarMovieProvider : MainAPI() {
                     ?.replace("\\/", "/")?.replace("\\u0026", "&")
                 ?: return false
             if (blob.isBlank()) return false
-            // 3. run rotating decryptor, exactly like vsdec.js
+            // 3. run rotating decryptor (pure-Kotlin replica of vsdec.js)
             val wasmBytes = app.get(
                 wasmUrl, headers = mapOf("Referer" to cloudReferer)
             ).body.byteStream().readBytes()
             if (wasmBytes.size < 100) return false
-            val masters = VsWasm().decryptStreamUrls(wasmBytes, blob)
+            val masters = VsCrypto().decryptStreamUrls(wasmBytes, blob)
             if (masters.isEmpty()) return false
             // 4. per-host IP-bound token (mirrors player.js loadStream)
             var emitted = 0

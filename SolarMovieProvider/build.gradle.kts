@@ -10,8 +10,3 @@ cloudstream {
 
     tvTypes = listOf("Movie", "TvSeries")
 }
-
-dependencies {
-    // Pure-JVM WebAssembly runtime: runs the rotating vidsrc stream decryptor (vsdec)
-    implementation("com.dylibso.chicory:runtime:1.7.5")
-}
