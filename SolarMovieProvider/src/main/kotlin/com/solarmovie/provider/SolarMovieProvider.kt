@@ -169,7 +169,7 @@ class SolarMovieProvider : MainAPI() {
                 this.plot = plot
                 this.year = year
                 this.tags = if (tags.isNotEmpty()) tags else genres.ifEmpty { null }
-                this.actors = actors?.split(",")?.map { Actor(it.trim()) }
+                this.actors = actors?.split(",")?.map { ActorData(Actor(it.trim())) }
             }
         }
 
@@ -188,7 +188,7 @@ class SolarMovieProvider : MainAPI() {
             this.plot = plot
             this.year = year
             this.tags = if (tags.isNotEmpty()) tags else genres.ifEmpty { null }
-            this.actors = actors?.split(",")?.map { Actor(it.trim()) }
+            this.actors = actors?.split(",")?.map { ActorData(Actor(it.trim())) }
         }
     }
 
