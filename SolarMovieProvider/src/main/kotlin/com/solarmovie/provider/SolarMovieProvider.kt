@@ -69,8 +69,8 @@ class SolarMovieProvider : MainAPI() {
             ?: selectFirst("h2")?.text()?.trim()
             ?: return null
         if (title.isBlank()) return null
-        val posterRaw = img?.attr("data-src")?.ifBlank { img.attr("src") } ?: ""
-        val poster = fixUrlNull(posterRaw?.replace("w_40/h_60", "w_156/h_234"))?.ifBlank { null }
+        val posterRaw = img?.attr("data-src")?.ifBlank { img?.attr("src") ?: "" } ?: ""
+        val poster = fixUrlNull(posterRaw.replace("w_40/h_60", "w_156/h_234"))?.ifBlank { null }
         // badge: HD = movie, Eps = series
         val badge = selectFirst("span.mlbq, span.mlbe")?.text() ?: ""
         val isSeries = badge.contains("Eps", ignoreCase = true) ||
@@ -140,7 +140,7 @@ class SolarMovieProvider : MainAPI() {
 
         val poster = fixUrlNull(
             document.selectFirst("img.lazy")?.attr("data-src")
-                ?.ifBlank { document.selectFirst("img.lazy")?.attr("src") }
+                ?.ifBlank { document.selectFirst("img.lazy")?.attr("src") ?: "" }
                 ?: document.selectFirst("meta[property=og:image]")?.attr("content")
         )?.replace("w_40/h_60", "w_200/h_300")
 
