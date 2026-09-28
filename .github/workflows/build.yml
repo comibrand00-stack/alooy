@@ -44,9 +44,18 @@ jobs:
       - name: Build Plugins
         run: |
           cd $GITHUB_WORKSPACE/src
-          ./gradlew make makePluginsJson --stacktrace
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
-          cp build/plugins.json $GITHUB_WORKSPACE/builds
+          ./gradlew make makePluginsJson --stacktrace 2>&1 | tee $GITHUB_WORKSPACE/build.log
+          status=${PIPESTATUS[0]}
+          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds || true
+          cp build/plugins.json $GITHUB_WORKSPACE/builds || true
+          exit $status
+
+      - name: Report errors
+        if: failure()
+        run: |
+          echo "=== compiler errors ==="
+          grep -E "^e: |error:|FAILED|Execution failed|What went wrong" $GITHUB_WORKSPACE/build.log | head -n 30 || true
+          grep -E "^e: " $GITHUB_WORKSPACE/build.log | head -n 10 | while IFS= read -r line; do echo "::error::$line"; done || true
 
       - name: Push builds
         env:
